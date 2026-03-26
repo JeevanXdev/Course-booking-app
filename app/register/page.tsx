@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { saveToken } from "@/lib/auth";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 
 export default function RegisterPage() {
   const [username, setUsername] = useState("");
@@ -13,53 +15,72 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
 
   const router = useRouter();
+  const { refreshUser } = useAuth();
 
   const register = async () => {
-  setError("");
-  setMessage("");
+    setError("");
+    setMessage("");
 
-  if (!username || !email || !password) {
-    setError("All fields are required.");
-    return;
-  }
-
-  try {
-    const res = await api.post(
-      "/auth/register/",
-      {
-        username,
-        email,
-        password,
-      },
-      {
-        headers: {
-          Authorization: undefined, // prevent token from being sent
-        },
-      }
-    );
-
-    setMessage("✅ Registration successful! Redirecting to login...");
-
-    setTimeout(() => {
-      router.push("/login");
-    }, 1500);
-
-  } catch (err: any) {
-    const backendError = err?.response?.data;
-
-    console.log("Register error:", backendError);
-
-    if (backendError?.username) {
-      setError(backendError.username[0]);
-    } else if (backendError?.email) {
-      setError(backendError.email[0]);
-    } else if (backendError?.password) {
-      setError(backendError.password[0]);
-    } else {
-      setError("Registration failed. Please try again.");
+    if (!username || !email || !password) {
+      setError("All fields are required.");
+      return;
     }
-  }
-};
+
+    try {
+      // Step 1: Register user
+      await api.post(
+        "/auth/register/",
+        {
+          username,
+          email,
+          password,
+        },
+        {
+          headers: {
+            Authorization: undefined,
+          },
+        }
+      );
+
+      // Step 2: Automatically login after register
+      const loginRes = await api.post(
+        "/auth/login/",
+        {
+          username,
+          password,
+        },
+        {
+          headers: {
+            Authorization: undefined,
+          },
+        }
+      );
+
+      // Step 3: Save token
+      saveToken(loginRes.data.access);
+
+      // Step 4: Update global auth state
+      await refreshUser();
+
+      // Step 5: Redirect to dashboard
+      router.push("/dashboard");
+
+    } catch (err: any) {
+      const backendError = err?.response?.data;
+
+      console.log("Register error:", backendError);
+
+      if (backendError?.username) {
+        setError(backendError.username[0]);
+      } else if (backendError?.email) {
+        setError(backendError.email[0]);
+      } else if (backendError?.password) {
+        setError(backendError.password[0]);
+      } else {
+        setError("Registration failed. Please try again.");
+      }
+    }
+  };
 
   return (
     <div className="max-w-md mx-auto bg-white p-6 rounded-xl shadow-md mt-10">
