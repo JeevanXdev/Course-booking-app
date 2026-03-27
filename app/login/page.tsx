@@ -33,7 +33,7 @@ export default function LoginPage() {
       router.push("/dashboard");
 
     } catch (err) {
-      setError("Invalid username or password");
+      setError("Invalid username or password. Maybe you have not registerd yet? Please register first.");
     }
   };
 
